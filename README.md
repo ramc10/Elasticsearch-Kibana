@@ -1,3 +1,3 @@
 # Elasticsearch-Kibana
 
-Docker-compose file tp setup in one click
+Docker-compose file to setup in one click
