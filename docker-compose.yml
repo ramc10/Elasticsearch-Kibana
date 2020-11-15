@@ -1,0 +1,106 @@
+version: '3.7'
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.8.0
+    container_name: elasticsearch
+    environment:
+      - node.name=elasticsearch
+      - cluster.name=docker-cluster
+      - cluster.initial_master_nodes=elasticsearch1
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms256M -Xmx256M"
+      - http.cors.enabled=true
+      - http.cors.allow-origin=*
+      - network.host=_eth0_
+    ulimits:
+      nproc: 65535
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - type: volume
+        source: logs
+        target: /var/log
+      - type: volume
+        source: esdata1
+        target: /usr/share/elasticsearch/data
+    networks:
+      - elastic
+    ports:
+      - 9200:9200
+      - 9300:9300
+      
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.8.0
+    container_name: kibana
+    environment:
+      SERVER_NAME: localhost
+      ELASTICSEARCH_URL: http://elasticsearch1:9200/
+    ports:
+      - 5601:5601
+    volumes:
+      - type: volume
+        source: logs
+        target: /var/log
+    ulimits:
+      nproc: 65535
+      memlock:
+        soft: -1
+        hard: -1
+    networks:
+      - elastic
+  
+  metricbeat:
+    image: docker.elastic.co/beats/metricbeat:7.8.0
+    # command: --strict.perms=false
+    environment:
+      - setup.kibana.host=kibana:5601
+      - output.elasticsearch.hosts=["elasticsearch:9200"]
+    volumes:
+      # - ${PWD}/configs/metricbeat.docker.yml:/usr/share/metricbeat/metricbeat.yml
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys/fs/cgroup:/hostfs/sys/fs/cgroup:ro
+      - /proc:/hostfs/proc:ro
+      - /:/hostfs:ro
+    networks:
+      - elastic
+
+  heartbeat:
+    image: docker.elastic.co/beats/heartbeat:7.8.0
+    command: --strict.perms=false
+    environment:
+      - setup.kibana.host=kibana:5601
+      - output.elasticsearch.hosts=["elasticsearch:9200"]
+    # volumes:
+    #   - ${PWD}/configs/heartbeat.docker.yml:/usr/share/heartbeat/heartbeat.yml
+    networks:
+      - elastic
+
+  packetbeat:
+    image: docker.elastic.co/beats/packetbeat:7.8.0
+    command: --strict.perms=false
+    environment:
+      - setup.kibana.host=kibana:5601
+      - output.elasticsearch.hosts=["elasticsearch:9200"]
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    # volumes:
+    #   - ${PWD}/configs/packetbeat.docker.yml:/usr/share/packetbeat/packetbeat.yml
+    networks:
+      - elastic
+
+
+volumes:
+  esdata1:
+  logs:
+
+networks:
+  elastic:
+
+#   heartbeat_config:
+#     file: configs/heartbeat.docker.yml
+#   metricbeat_config:
+#     file: configs/metricbeat.docker.yml
+#   packetbeat_config:
+#     file: configs/packetbeat.docker.yml
